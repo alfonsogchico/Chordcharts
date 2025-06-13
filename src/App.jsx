@@ -9,41 +9,24 @@ import {
   orderBy
 } from 'firebase/firestore';
 
-// ------------- Firebase init (safe) -------------
-// Define VITE_FIREBASE_CONFIG in Vercel → JSON string with apiKey, authDomain, etc.
+// --- Firebase init ---
+// Asegúrate de definir VITE_FIREBASE_CONFIG en Vercel Dashboard
+// con el objeto JSON de tu proyecto Firebase
 const firebaseConfig =
   typeof import.meta.env.VITE_FIREBASE_CONFIG !== 'undefined'
     ? JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG)
     : {};
 
-let db = null;
-try {
-  if (firebaseConfig && firebaseConfig.apiKey) {
-    const app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-  } else {
-    console.warn('Firebase config missing: guardado/carga desactivados');
-  }
-} catch (e) {
-  console.error('Firebase init error', e);
-}
-
-// ------------- UI helpers -------------
-const StaffLines = () => (
-  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
-    {[...Array(5)].map((_, i) => (
-      <div key={i} className="border-t border-black/70" />
-    ))}
-  </div>
-);
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
 
 export default function App() {
   const [chart, setChart] = useState('C | G | Am | F :|x2');
   const [charts, setCharts] = useState([]);
 
-  // ---------- CRUD ----------
+  // --- CRUD ---
   const saveChart = async () => {
-    if (!db || !chart.trim()) return;
+    if (!chart.trim()) return;
     await addDoc(collection(db, 'charts'), {
       chart,
       savedAt: Date.now()
@@ -52,89 +35,87 @@ export default function App() {
   };
 
   const loadCharts = async () => {
-    if (!db) return;
     const snap = await getDocs(
       query(collection(db, 'charts'), orderBy('savedAt', 'desc'))
     );
-    setCharts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    setCharts(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   };
 
   useEffect(() => {
     loadCharts();
-  }, [db]);
+  }, []);
 
-  // ---------- Chart parsing ----------
+  // --- helpers ---
   const measures = chart
     .split('|')
-    .map((s) => s.trim())
+    .map(s => s.trim())
     .filter(Boolean);
 
   const renderMeasure = (m, i) => {
     const isFirst = i === 0;
-    const repeat = /:\|x?\d*$/.test(m); // detect final :| or :|x2 etc.
-
-    const classes = [
-      'px-3',
-      'min-w-[70px]',
-      'text-center',
-      'border-black',
-      repeat ? 'border-double border-r-4' : 'border-r',
-      isFirst ? 'border-l-2' : ''
-    ].join(' ');
+    const repeat = /:\|/.test(m) || /:\|x\d+$/.test(m);
+    const style = {
+      padding: '0 8px',
+      borderRight: repeat ? 'double #000 3px' : '1px solid #000',
+      borderLeft: isFirst ? '2px solid #000' : undefined,
+      minWidth: 60,
+      textAlign: 'center'
+    };
 
     return (
-      <div key={i} className={classes}>
+      <div key={i} style={style}>
         {m.replace(/:\|x?\d*$/, '')}
       </div>
     );
   };
 
-  // ---------- Render ----------
   return (
-    <div className="max-w-3xl mx-auto mt-10 font-sans px-4">
-      <h1 className="text-2xl font-bold mb-4">ChordCharts</h1>
+    <div style={{ maxWidth: 800, margin: '40px auto', fontFamily: 'sans-serif' }}>
+      <h1>ChordCharts</h1>
 
-      {/* Editor */}
       <textarea
         rows={4}
         value={chart}
-        onChange={(e) => setChart(e.target.value)}
-        className="w-full font-mono text-base border border-gray-300 rounded p-2 mb-4"
+        onChange={e => setChart(e.target.value)}
+        style={{ width: '100%', fontFamily: 'monospace', fontSize: 16 }}
       />
 
-      <button
-        onClick={saveChart}
-        className="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded mb-6"
-      >
+      <button onClick={saveChart} style={{ margin: '12px 0' }}>
         Guardar
       </button>
 
-      {/* Staff */}
-      <div className="relative overflow-x-auto">
-        <StaffLines />
-        <div className="flex border-y-2 border-black bg-white/80 backdrop-blur-sm">
-          {measures.map(renderMeasure)}
-        </div>
+      <div
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          borderTop: '2px solid #000',
+          borderBottom: '2px solid #000',
+          padding: '4px 0'
+        }}
+      >
+        {measures.map(renderMeasure)}
       </div>
 
-      {/* Saved charts */}
-      {db && (
-        <>
-          <h2 className="text-xl font-semibold mt-8 mb-2">Guardados</h2>
-          <ul className="space-y-1">
-            {charts.map((c) => (
-              <li key={c.id}>
-                <button
-                  onClick={() => setChart(c.chart)}
-                  className="underline text-blue-700 hover:text-blue-900"
-                >
-                  {c.chart}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      <h2>Guardados</h2>
+      <ul>
+        {charts.map(c => (
+          <li key={c.id}>
+            <button
+              onClick={() => setChart(c.chart)}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: 0,
+                margin: 0,
+                textDecoration: 'underline',
+                cursor: 'pointer'
+              }}
+            >
+              {c.chart}
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
