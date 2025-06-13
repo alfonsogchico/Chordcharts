@@ -216,18 +216,25 @@ export default function App() {
             pdf.setFontSize(10); pdf.setTextColor(100); pdf.text(`Tonalidad: ${chart.key} ${chart.mode === 'major' ? 'Mayor' : 'Menor'}`, MARGIN, y); y += 15;
 
             const CHORD_FONT_SIZE = 12; const SECTION_FONT_SIZE = 14; const LINE_HEIGHT = 16;
-            const SECTION_SPACING = 2;
+            const SECTION_SPACING = 2; // Ajustado según la preferencia del usuario
             const CONTENT_WIDTH = pdf.internal.pageSize.getWidth() - MARGIN * 2; const MEASURE_WIDTH = CONTENT_WIDTH / 4;
 
             for (const section of chart.sections) {
                 if (section.measures.length === 0) continue;
-                if (y > pdf.internal.pageSize.getHeight() - MARGIN * 2) { pdf.addPage(); y = MARGIN; }
+                if (y > pdf.internal.pageSize.getHeight() - MARGIN * 2) {
+                    pdf.addPage();
+                    y = MARGIN;
+                }
                 pdf.setFont('helvetica', 'bold'); pdf.setFontSize(SECTION_FONT_SIZE); pdf.setTextColor(0); pdf.text(section.name, MARGIN, y); y += LINE_HEIGHT;
                 
                 pdf.setFont('helvetica', 'bold'); pdf.setFontSize(CHORD_FONT_SIZE);
 
                 for (let i = 0; i < section.measures.length; i += 4) {
-                    if (y > pdf.internal.pageSize.getHeight() - MARGIN - 5) { pdf.addPage(); y = MARGIN; }
+                    if (y > pdf.internal.pageSize.getHeight() - MARGIN - 5) {
+                        pdf.addPage();
+                        // CORRECCIÓN: Ajusta la posición 'y' en las páginas nuevas para un margen consistente.
+                        y = MARGIN + LINE_HEIGHT;
+                    }
                     const lineMeasures = section.measures.slice(i, i + 4);
                     let x = MARGIN;
                     const measureYPos = y - LINE_HEIGHT * 0.7;
@@ -235,7 +242,6 @@ export default function App() {
                     lineMeasures.forEach((measure, j) => {
                         const startBarX = x; const endBarX = x + MEASURE_WIDTH;
 
-                        // CORRECCIÓN: Espaciado proporcional para 2 acordes por compás
                         if (measure.chords.length > 1) {
                             pdf.text(measure.chords[0] || '', startBarX + 3, y - 2);
                             pdf.text(measure.chords[1] || '', startBarX + (MEASURE_WIDTH / 2), y - 2);
