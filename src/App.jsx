@@ -12,39 +12,55 @@ let appId; // Se definirá después de la configuración
 
 try {
     let firebaseConfig;
-    const env = process.env;
 
     // Prioridad 1: Entorno Canvas (usa variables globales inyectadas)
-    if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-        console.log("Cargando configuración de Firebase desde el entorno Canvas.");
+    if (typeof __firebase_config !== 'undefined' && __firebase_config && __firebase_config !== "{}") {
+        console.log("Cargando configuración de Firebase desde el entorno de Canvas.");
         firebaseConfig = JSON.parse(__firebase_config);
         appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.appId;
-    } 
-    // Prioridad 2: Entorno de producción (Vercel) con prefijo de Create-React-App
-    else if (env.REACT_APP_FIREBASE_API_KEY) {
-        console.log("Cargando configuración de Firebase desde variables de entorno REACT_APP_.");
-        firebaseConfig = {
-            apiKey: env.REACT_APP_FIREBASE_API_KEY,
-            authDomain: env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-            projectId: env.REACT_APP_FIREBASE_PROJECT_ID,
-            storageBucket: env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-            messagingSenderId: env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-            appId: env.REACT_APP_FIREBASE_APP_ID,
-        };
-        appId = firebaseConfig.projectId; 
     }
-    // Prioridad 3: Entorno de producción (Vercel) con prefijo de Vite
-    else if (env.VITE_FIREBASE_API_KEY) {
-        console.log("Cargando configuración de Firebase desde variables de entorno VITE_.");
-        firebaseConfig = {
-            apiKey: env.VITE_FIREBASE_API_KEY,
-            authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
-            projectId: env.VITE_FIREBASE_PROJECT_ID,
-            storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
-            messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-            appId: env.VITE_FIREBASE_APP_ID,
-        };
-        appId = firebaseConfig.projectId; 
+    // Prioridad 2: Entornos de producción (Vercel, etc.)
+    // Solo intenta acceder a `process` si existe. Esto evita el error "process is not defined".
+    else if (typeof process !== 'undefined') {
+        const env = process.env;
+        console.log("Entorno Node.js/Bundler detectado, comprobando variables de entorno...");
+
+        if (env.REACT_APP_FIREBASE_API_KEY) {
+            console.log("Cargando configuración de Firebase desde variables de entorno REACT_APP_.");
+            firebaseConfig = {
+                apiKey: env.REACT_APP_FIREBASE_API_KEY,
+                authDomain: env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+                projectId: env.REACT_APP_FIREBASE_PROJECT_ID,
+                storageBucket: env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+                messagingSenderId: env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+                appId: env.REACT_APP_FIREBASE_APP_ID,
+            };
+            appId = firebaseConfig.projectId;
+        }
+        else if (env.VITE_FIREBASE_API_KEY) {
+            console.log("Cargando configuración de Firebase desde variables de entorno VITE_.");
+            firebaseConfig = {
+                apiKey: env.VITE_FIREBASE_API_KEY,
+                authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+                projectId: env.VITE_FIREBASE_PROJECT_ID,
+                storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+                messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+                appId: env.VITE_FIREBASE_APP_ID,
+            };
+            appId = firebaseConfig.projectId;
+        }
+        else if (env.NEXT_PUBLIC_FIREBASE_API_KEY) {
+            console.log("Cargando configuración de Firebase desde variables de entorno NEXT_PUBLIC_.");
+            firebaseConfig = {
+                apiKey: env.NEXT_PUBLIC_FIREBASE_API_KEY,
+                authDomain: env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+                projectId: env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+                storageBucket: env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+                messagingSenderId: env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+                appId: env.NEXT_PUBLIC_FIREBASE_APP_ID,
+            };
+            appId = firebaseConfig.projectId;
+        }
     }
 
     if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
@@ -53,7 +69,7 @@ try {
         db = getFirestore(app);
         if (!appId) appId = firebaseConfig.projectId || 'default-app-id'; // Asegura que appId tenga un valor
     } else {
-        console.error("FATAL: No se encontró la configuración de Firebase. No se pudo cargar desde el entorno de Canvas ni desde las variables de entorno (.env). Por favor, revisa la configuración de Environment Variables en Vercel y haz un 'Redeploy'.");
+        console.error("FATAL: No se encontró la configuración de Firebase. No se pudo cargar desde el entorno de Canvas ni desde las variables de entorno (REACT_APP_, VITE_, NEXT_PUBLIC_). Por favor, revisa la configuración de Environment Variables en Vercel y haz un 'Redeploy'.");
         appId = 'default-app-id'; // Fallback
     }
 } catch (e) {
@@ -97,7 +113,7 @@ const useHistoryState = (initialState) => {
     const resetHistory = (newState) => { setHistory([newState]); setIndex(0); };
     return [state, setState, undo, redo, index > 0, index < history.length - 1, resetHistory];
 };
-console.log("Valor de la clave de API en el entorno:", process.env.REACT_APP_FIREBASE_API_KEY);
+
 // --- Componente Principal de la App ---
 export default function App() {
     const [userId, setUserId] = useState(null);
