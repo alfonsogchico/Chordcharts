@@ -19,8 +19,22 @@ try {
         firebaseConfig = JSON.parse(__firebase_config);
         appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.appId;
     }
-    // Prioridad 2: Create React App Environment (Vercel lo usa por defecto para apps de React)
-    else if (process.env.REACT_APP_FIREBASE_API_KEY) {
+    // CORRECCIÓN DEFINITIVA: Se usa `import.meta.env` para proyectos VITE.
+    // Esto es diferente a `process.env` y es la forma correcta para Vercel/Vite.
+    else if (import.meta.env.VITE_FIREBASE_API_KEY) {
+        console.log("Cargando configuración de Firebase desde variables de entorno VITE_ (import.meta.env).");
+        firebaseConfig = {
+            apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+            authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+            projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+            storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+            messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+            appId: import.meta.env.VITE_FIREBASE_APP_ID,
+        };
+        appId = firebaseConfig.projectId;
+    }
+     // Soporte para Create React App si se usara en otro proyecto
+    else if (typeof process !== 'undefined' && process.env.REACT_APP_FIREBASE_API_KEY) {
         console.log("Cargando configuración de Firebase desde variables de entorno REACT_APP_.");
         firebaseConfig = {
             apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -32,32 +46,6 @@ try {
         };
         appId = firebaseConfig.projectId;
     }
-    // Prioridad 3: Vite Environment
-    else if (process.env.VITE_FIREBASE_API_KEY) {
-        console.log("Cargando configuración de Firebase desde variables de entorno VITE_.");
-        firebaseConfig = {
-            apiKey: process.env.VITE_FIREBASE_API_KEY,
-            authDomain: process.env.VITE_FIREBASE_AUTH_DOMAIN,
-            projectId: process.env.VITE_FIREBASE_PROJECT_ID,
-            storageBucket: process.env.VITE_FIREBASE_STORAGE_BUCKET,
-            messagingSenderId: process.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-            appId: process.env.VITE_FIREBASE_APP_ID,
-        };
-        appId = firebaseConfig.projectId;
-    }
-    // Prioridad 4: Next.js Environment
-    else if (process.env.NEXT_PUBLIC_FIREBASE_API_KEY) {
-        console.log("Cargando configuración de Firebase desde variables de entorno NEXT_PUBLIC_.");
-        firebaseConfig = {
-            apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-            authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-            projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-            storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-            messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-            appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-        };
-        appId = firebaseConfig.projectId;
-    }
 
     if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
         app = initializeApp(firebaseConfig);
@@ -65,7 +53,7 @@ try {
         db = getFirestore(app);
         if (!appId) appId = firebaseConfig.projectId || 'default-app-id'; // Asegura que appId tenga un valor
     } else {
-        console.error("FATAL: No se encontró la configuración de Firebase. No se pudo cargar desde el entorno de Canvas ni desde las variables de entorno (REACT_APP_, VITE_, NEXT_PUBLIC_). Por favor, revisa la configuración de Environment Variables en Vercel y haz un 'Redeploy'.");
+        console.error("FATAL: No se encontró la configuración de Firebase. Revisa la configuración de Environment Variables en Vercel (con prefijo VITE_) y haz un 'Redeploy'.");
         appId = 'default-app-id'; // Fallback
     }
 } catch (e) {
@@ -86,7 +74,6 @@ const getUseSharp = (key) => { const root = key.replace('m', ''); const flatKeys
 const getDiatonicChords = (key, mode, quality) => { const keyIndex = getNoteIndex(key); if (keyIndex === -1) return []; const useSharp = getUseSharp(key); let qualities; if (mode === 'major') { qualities = quality === 'tetrad' ? [{q:'maj7',i:0},{q:'m7',i:2},{q:'m7',i:4},{q:'maj7',i:5},{q:'7',i:7},{q:'m7',i:9}] : [{q:'',i:0},{q:'m',i:2},{q:'m',i:4},{q:'',i:5},{q:'7',i:7},{q:'m',i:9}]; } else { qualities = quality === 'tetrad' ? [{q:'m7',i:0},{q:'m7b5',i:2},{q:'maj7',i:3},{q:'m7',i:5},{q:'7',i:7},{q:'maj7',i:8},{q:'7',i:10}] : [{q:'m',i:0},{q:'dim',i:2},{q:'',i:3},{q:'m',i:5},{q:'',i:7},{q:'',i:8},{q:'',i:10}]; } return qualities.map(c => getNoteName(keyIndex + c.i, useSharp) + c.q); };
 const getOtherChords = (key, mode = 'major', quality = 'tetrad') => { const keyIndex = getNoteIndex(key); if (keyIndex === -1) return []; const useSharp = getUseSharp(key); const chords = []; const secondaryTargets = mode === 'major' ? [2, 4, 7, 9] : [5, 7]; secondaryTargets.forEach(step => { const targetNoteIndex = keyIndex + step; const dominantIndex = targetNoteIndex + 7; const dominantNote = getNoteName(dominantIndex, useSharp); chords.push(dominantNote + (quality === 'tetrad' ? '7' : '')); }); if (mode === 'major') { const ivm = getNoteName(keyIndex + 5, useSharp) + (quality === 'tetrad' ? 'm7' : 'm'); const bVI = getNoteName(keyIndex + 8, false) + (quality === 'tetrad' ? 'maj7' : ''); const bVII = getNoteName(keyIndex + 10, false) + (quality === 'tetrad' ? '7' : ''); chords.push(ivm, bVI, bVII); } return [...new Set(chords)]; };
 
-// CORRECCIÓN: Se ha restaurado la función de transposición a la versión original que funcionaba.
 const transposeChord = (chord, steps, newKey) => {
     if (chord === '%') return '%';
     const useSharp = getUseSharp(newKey);
