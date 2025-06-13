@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query } from 'firebase/firestore';
+import { getFirestore, doc, setDoc, getDoc, collection, getDocs, query, deleteDoc } from 'firebase/firestore';
 import { ChevronUp, ChevronDown, Save, Music4, Trash2, Copy, PlusCircle, Pilcrow, CaseUpper, Undo2, Tally3, Tally4, X, Scissors, ClipboardPaste, Redo2, FileDown, FolderOpen, Loader2, CheckCircle, XCircle, LogOut } from 'lucide-react';
 
 // NOTA: jspdf se carga desde un CDN en el entorno de ejecución.
@@ -30,19 +30,6 @@ try {
         };
         appId = firebaseConfig.projectId;
     }
-     // Soporte para Create React App si se usara en otro proyecto
-    else if (typeof process !== 'undefined' && process.env.REACT_APP_FIREBASE_API_KEY) {
-        firebaseConfig = {
-            apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
-            authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
-            projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
-            storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
-            messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
-            appId: process.env.REACT_APP_FIREBASE_APP_ID,
-        };
-        appId = firebaseConfig.projectId;
-    }
-
 
     if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
         app = initializeApp(firebaseConfig);
@@ -97,7 +84,7 @@ const useHistoryState = (initialState) => {
 
 // --- Componente Principal de la App ---
 export default function App() {
-    const [user, setUser] = useState(null); // Estado para el objeto de usuario completo
+    const [user, setUser] = useState(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
     const [chart, setChart, undoChart, redoChart, canUndo, canRedo, resetHistory] = useHistoryState({
         id: `chart-${Date.now()}`, title: 'Mi Partitura', artist: 'Anónimo',
@@ -121,7 +108,6 @@ export default function App() {
     // --- Efectos ---
     useEffect(() => { const scripts = [ 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js' ]; let loadedCount = 0; scripts.forEach(src => { if (document.querySelector(`script[src="${src}"]`)) { loadedCount++; if (loadedCount === scripts.length) setPdfScriptsLoaded(true); return; } const script = document.createElement('script'); script.src = src; script.async = true; script.onload = () => { loadedCount++; if (loadedCount === scripts.length) setPdfScriptsLoaded(true); }; document.body.appendChild(script); }); }, []);
     
-    // Observador del estado de autenticación
     useEffect(() => {
         if (!auth) {
             setIsAuthReady(true);
@@ -139,7 +125,6 @@ export default function App() {
             setIsAuthReady(true);
         });
 
-        // Lógica de token para el entorno de Canvas
         (async () => {
             const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
             if (token && !auth.currentUser) {
@@ -170,10 +155,7 @@ export default function App() {
             await signInWithPopup(auth, provider);
             showNotification('¡Sesión iniciada con éxito!', 'success');
         } catch (error) {
-            console.error("Error detallado al iniciar sesión con Google:", {
-                code: error.code,
-                message: error.message,
-            });
+            console.error("Error al iniciar sesión con Google:", error);
             if (error.code === 'auth/unauthorized-domain') {
                 showNotification('Error: Dominio no autorizado. Revisa la configuración de Firebase.', 'error', 6000);
             } else {
@@ -438,7 +420,83 @@ export default function App() {
     const ChordInput = () => { const diatonicChords = getDiatonicChords(chart.key, chart.mode, chordMode); const otherChords = getOtherChords(chart.key, chart.mode, chordMode); const repeatSymbols = ['|:', ':|', ':|x2', ':|x3', ':|x4', '|', '||']; const [manualRoot, setManualRoot] = useState('C'); const [manualQuality, setManualQuality] = useState('maj7'); const [manualBass, setManualBass] = useState(''); const manualQualities = { tetrad: ['maj7', 'm7', '7', 'm7b5', 'dim7', 'sus4(7)', 'maj6'], triad: ['', 'm', 'dim', 'aug', 'sus4', 'sus2'] }; const palettes = { 'Diatónicos': 'diatonic', 'Otros': 'other', 'Símbolos': 'symbols', 'Manual': 'manual' }; const ChordButton = ({ chord }) => <button onClick={() => handleInsertChord(chord)} className="bg-white border border-gray-300 rounded-md py-3 px-2 text-sm font-semibold text-gray-700 hover:bg-blue-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm">{chord}</button>; const handleManualAdd = () => { let chord = manualRoot + manualQuality; if(manualBass) chord += `/${manualBass.replace('/', '')}`; handleInsertChord(chord); setManualBass(''); }; return ( <footer className="bg-gray-200 border-t-2 border-gray-300 p-2 fixed bottom-0 left-0 right-0 z-20"> <div className="max-w-4xl mx-auto"> <div className="flex justify-center items-center gap-2 mb-2 flex-wrap">{Object.entries(palettes).map(([label, key]) => <button key={key} onClick={() => setActivePalette(key)} className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${activePalette === key ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'}`}>{label}</button>)}</div> <div className="flex justify-center items-center gap-4 mb-3 flex-wrap"> <button onClick={undoChart} disabled={!canUndo} className="p-2 bg-white text-gray-700 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100" title="Deshacer"><Undo2 size={18}/></button> <button onClick={redoChart} disabled={!canRedo} className="p-2 bg-white text-gray-700 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100" title="Rehacer"><Redo2 size={18}/></button> {(activePalette !== 'manual' && activePalette !== 'symbols') && <button onClick={() => setChordMode(c => c === 'triad' ? 'tetrad' : 'triad')} className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-full bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 transition-colors">{chordMode === 'triad' ? <Tally3 className="h-4 w-4 text-blue-600"/> : <Tally4 className="h-4 w-4 text-blue-600"/>} {chordMode === 'triad' ? 'Tríadas' : 'Cuatríadas'}</button>} <div className="flex items-center"><label htmlFor="double-chord-toggle" className="text-sm font-medium text-gray-700 mr-2">2 acordes/compás</label><input type="checkbox" id="double-chord-toggle" checked={isDoubleChordMode} onChange={e => setIsDoubleChordMode(e.target.checked)} className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300" /></div> </div> <div className="grid grid-cols-4 sm:grid-cols-8 gap-2"> {activePalette === 'diatonic' && diatonicChords.map(c => <ChordButton key={c} chord={c} />)} {activePalette === 'other' && otherChords.map(c => <ChordButton key={c} chord={c} />)} {activePalette === 'symbols' && repeatSymbols.map(c => <ChordButton key={c} chord={c} />)} {activePalette === 'manual' &&  <> <select value={manualRoot} onChange={e => setManualRoot(e.target.value)} className="col-span-2 bg-white border rounded p-2 text-sm">{NOTES_SHARP.map(n=><option key={n}>{n}</option>)}</select> <select value={manualQuality} onChange={e => setManualQuality(e.target.value)} className="col-span-3 bg-white border rounded p-2 text-sm">{manualQualities[chordMode].map(q => <option key={q} value={q}>{q || 'maj'}</option>)}</select> <input value={manualBass} onChange={e => setManualBass(e.target.value)} placeholder="/E" className="col-span-2 bg-white border rounded p-2 text-sm"/> <button onClick={handleManualAdd} className="bg-blue-500 text-white rounded-md p-2 font-bold col-span-1">Add</button></>} </div> </div> </footer> ); };
     const NewChartModal = ({ isOpen, onClose, onCreate }) => { const [newData, setNewData] = useState({ title: '', artist: '', mode: 'major', key: 'C' }); if (!isOpen) return null; const handleSubmit = (e) => { e.preventDefault(); onCreate(newData); }; const keysForMode = newData.mode === 'major' ? MAJOR_KEYS_CHROMATIC : MINOR_KEYS_CHROMATIC; return ( <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center"> <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md"> <div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-bold text-gray-800">Nueva Partitura</h2><button onClick={onClose} className="text-gray-500 hover:text-gray-800"><X size={24}/></button></div> <form onSubmit={handleSubmit}> <div className="mb-4"><label className="block text-gray-700">Título</label><input type="text" value={newData.title} onChange={e => setNewData({...newData, title: e.target.value})} className="w-full px-3 py-2 border rounded-md" required /></div> <div className="mb-4"><label className="block text-gray-700">Artista</label><input type="text" value={newData.artist} onChange={e => setNewData({...newData, artist: e.target.value})} className="w-full px-3 py-2 border rounded-md" /></div> <div className="flex gap-4 mb-6"> <div className="w-1/2"><label className="block text-gray-700">Tonalidad</label><select value={newData.key} onChange={e => setNewData({...newData, key: e.target.value})} className="w-full px-3 py-2 border rounded-md">{keysForMode.map(k => <option key={k} value={k}>{k}</option>)}</select></div> <div className="w-1/2"><label className="block text-gray-700">Modo</label><select value={newData.mode} onChange={e => setNewData({...newData, mode: e.target.value, key: e.target.value === 'major' ? 'C' : 'Am'})} className="w-full px-3 py-2 border rounded-md"><option value="major">Mayor</option><option value="minor">Menor</option></select></div> </div> <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 font-semibold">Crear Partitura</button> </form> </div> </div> ); };
     const ContextualMenu = () => { if (!selection.start) return null; return ( <div className="absolute z-30 bg-white shadow-lg rounded-lg p-2 flex gap-2" style={{ top: '10px', right: '10px' }}> {clipboard.length > 0 && <button onClick={() => handleContextAction('paste')} className="p-2 hover:bg-gray-200 rounded-md" title="Pegar"><ClipboardPaste size={18} /></button>} <button onClick={() => handleContextAction('copy')} className="p-2 hover:bg-gray-200 rounded-md" title="Copiar"><Copy size={18} /></button> <button onClick={() => handleContextAction('cut')} className="p-2 hover:bg-gray-200 rounded-md" title="Cortar"><Scissors size={18} /></button> <button onClick={() => handleContextAction('delete')} className="p-2 hover:bg-red-100 text-red-600 rounded-md" title="Eliminar"><Trash2 size={18} /></button> </div> ); };
-    const LoadChartModal = ({ isOpen, onClose, onLoad }) => { const [savedCharts, setSavedCharts] = useState([]); const [isLoading, setIsLoading] = useState(true); useEffect(() => { if (isOpen && user && !user.isAnonymous && db) { setIsLoading(true); const fetchCharts = async () => { try { const chartsRef = collection(db, `artifacts/${appId}/users/${user.uid}/charts`); const q = query(chartsRef); const querySnapshot = await getDocs(q); const charts = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id })); setSavedCharts(charts); } catch (error) { console.error("Error al cargar partituras:", error); showNotification("No se pudieron cargar las partituras.", "error"); } finally { setIsLoading(false); } }; fetchCharts(); } else { setSavedCharts([]); setIsLoading(false); } }, [isOpen, user]); if (!isOpen) return null; return ( <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center"> <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg"> <div className="flex justify-between items-center mb-4"> <h2 className="text-2xl font-bold text-gray-800">Cargar Partitura</h2> <button onClick={onClose} className="text-gray-500 hover:text-gray-800"><X size={24}/></button> </div> {isLoading ? <p>Cargando partituras...</p> : ( <ul className="space-y-2 max-h-96 overflow-y-auto"> {savedCharts.length > 0 ? savedCharts.sort((a,b) => new Date(b.savedAt) - new Date(a.savedAt)).map(chart => ( <li key={chart.id} onClick={() => onLoad(chart)} className="p-3 rounded-md hover:bg-blue-100 cursor-pointer border"> <p className="font-bold text-blue-800">{chart.title}</p> <p className="text-sm text-gray-500">{chart.artist} - {chart.savedAt ? new Date(chart.savedAt).toLocaleString() : 'Sin fecha'}</p> </li> )) : <p>{user && !user.isAnonymous ? "No has guardado ninguna partitura todavía." : "Inicia sesión para ver tus partituras."}</p>} </ul> )} </div> </div> ) };
+    const LoadChartModal = ({ isOpen, onClose, onLoad }) => {
+        const [savedCharts, setSavedCharts] = useState([]);
+        const [isLoading, setIsLoading] = useState(true);
+
+        useEffect(() => {
+            if (isOpen && user && !user.isAnonymous && db) {
+                setIsLoading(true);
+                const fetchCharts = async () => {
+                    try {
+                        const chartsRef = collection(db, `artifacts/${appId}/users/${user.uid}/charts`);
+                        const q = query(chartsRef);
+                        const querySnapshot = await getDocs(q);
+                        const charts = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                        setSavedCharts(charts);
+                    } catch (error) {
+                        console.error("Error al cargar partituras:", error);
+                        showNotification("No se pudieron cargar las partituras.", "error");
+                    } finally {
+                        setIsLoading(false);
+                    }
+                };
+                fetchCharts();
+            } else {
+                setSavedCharts([]);
+                setIsLoading(false);
+            }
+        }, [isOpen, user]);
+
+        const handleDelete = async (chartIdToDelete) => {
+            try {
+                const chartRef = doc(db, `artifacts/${appId}/users/${user.uid}/charts`, chartIdToDelete);
+                await deleteDoc(chartRef);
+                setSavedCharts(currentCharts => currentCharts.filter(chart => chart.id !== chartIdToDelete));
+                showNotification("Partitura eliminada.", "success");
+            } catch (error) {
+                console.error("Error al eliminar partitura:", error);
+                showNotification("Error al eliminar la partitura.", "error");
+            }
+        };
+        
+        if (!isOpen) return null;
+        
+        return (
+            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center">
+                <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-lg">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-2xl font-bold text-gray-800">Cargar Partitura</h2>
+                        <button onClick={onClose} className="text-gray-500 hover:text-gray-800"><X size={24}/></button>
+                    </div>
+                    {isLoading ? <p>Cargando partituras...</p> : (
+                        <ul className="space-y-2 max-h-96 overflow-y-auto">
+                            {savedCharts.length > 0 ? (
+                                savedCharts.sort((a,b) => new Date(b.savedAt) - new Date(a.savedAt)).map(chart => (
+                                    <li key={chart.id} className="flex items-center justify-between p-3 rounded-md hover:bg-blue-50 border transition-colors group">
+                                        <div onClick={() => onLoad(chart)} className="flex-grow cursor-pointer pr-4">
+                                            <p className="font-bold text-blue-800 group-hover:text-blue-600">{chart.title}</p>
+                                            <p className="text-sm text-gray-500">{chart.artist} - {chart.savedAt ? new Date(chart.savedAt).toLocaleString() : 'Sin fecha'}</p>
+                                        </div>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleDelete(chart.id);
+                                            }}
+                                            className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-100 rounded-full flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                                            title="Eliminar partitura"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    </li>
+                                ))
+                            ) : (<p>{user && !user.isAnonymous ? "No has guardado ninguna partitura todavía." : "Inicia sesión para ver tus partituras."}</p>)}
+                        </ul>
+                    )}
+                </div>
+            </div>
+        )
+    };
     
     if (!isAuthReady) return <div className="flex justify-center items-center h-screen bg-gray-900 text-white"><Loader2 className="animate-spin h-8 w-8 mr-3"/>Cargando aplicación...</div>;
     
@@ -450,7 +508,7 @@ export default function App() {
             <ChordChart />
             <ChordInput />
             <NewChartModal isOpen={isNewChartModalOpen} onClose={() => setIsNewChartModalOpen(false)} onCreate={handleCreateNewChart} />
-            <LoadChartModal isOpen={isLoadChartModalOpen} onClose={() => setIsLoadChartModalOpen(false)} onLoad={handleLoadChart} />
+            <LoadChartModal isOpen={isLoadChartModalOpen} onClose={() => setIsLoadChartModalOpen(false)} onLoad={handleLoadChart} showNotification={showNotification} />
         </div>
     );
 }
