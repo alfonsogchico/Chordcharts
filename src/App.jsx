@@ -215,7 +215,8 @@ export default function App() {
             pdf.setFont('helvetica', 'normal'); pdf.setFontSize(14); pdf.text(chart.artist, MARGIN, y); y += 5;
             pdf.setFontSize(10); pdf.setTextColor(100); pdf.text(`Tonalidad: ${chart.key} ${chart.mode === 'major' ? 'Mayor' : 'Menor'}`, MARGIN, y); y += 15;
 
-            const CHORD_FONT_SIZE = 12; const SECTION_FONT_SIZE = 14; const LINE_HEIGHT = 16; const SECTION_SPACING = 2;
+            const CHORD_FONT_SIZE = 12; const SECTION_FONT_SIZE = 14; const LINE_HEIGHT = 16;
+            const SECTION_SPACING = 8;
             const CONTENT_WIDTH = pdf.internal.pageSize.getWidth() - MARGIN * 2; const MEASURE_WIDTH = CONTENT_WIDTH / 4;
 
             for (const section of chart.sections) {
@@ -233,7 +234,15 @@ export default function App() {
 
                     lineMeasures.forEach((measure, j) => {
                         const startBarX = x; const endBarX = x + MEASURE_WIDTH;
-                        pdf.text(measure.chords.join('  '), startBarX + 3, y - 2);
+
+                        // CORRECCIÓN: Espaciado proporcional para 2 acordes por compás
+                        if (measure.chords.length > 1) {
+                            pdf.text(measure.chords[0] || '', startBarX + 3, y - 2);
+                            pdf.text(measure.chords[1] || '', startBarX + (MEASURE_WIDTH / 2), y - 2);
+                        } else {
+                            pdf.text(measure.chords[0] || '', startBarX + 3, y - 2);
+                        }
+                        
                         if (j === 0) {
                             if (measure.startRepeat) {
                                 pdf.setLineWidth(1); pdf.line(startBarX, measureYPos, startBarX, y);
