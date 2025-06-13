@@ -417,38 +417,104 @@ export default function App() {
         );
     };
 
-    const ChordInput = () => { const diatonicChords = getDiatonicChords(chart.key, chart.mode, chordMode); const otherChords = getOtherChords(chart.key, chart.mode, chordMode); const repeatSymbols = ['|:', ':|', ':|x2', ':|x3', ':|x4', '|', '||']; const [manualRoot, setManualRoot] = useState('C'); const [manualQuality, setManualQuality] = useState('maj7'); const [manualBass, setManualBass] = useState(''); const manualQualities = { tetrad: ['maj7', 'm7', '7', 'm7b5', 'dim7', 'sus4(7)', 'maj6'], triad: ['', 'm', 'dim', 'aug', 'sus4', 'sus2'] }; const palettes = { 'Diatónicos': 'diatonic', 'Otros': 'other', 'Símbolos': 'symbols', 'Manual': 'manual' }; const ChordButton = ({ chord }) => <button onClick={() => handleInsertChord(chord)} className="bg-white border border-gray-300 rounded-md py-3 px-2 text-sm font-semibold text-gray-700 hover:bg-blue-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm">{chord}</button>; const handleManualAdd = () => { let chord = manualRoot + manualQuality; if(manualBass) chord += `/${manualBass.replace('/', '')}`; handleInsertChord(chord); setManualBass(''); }; return ( <footer className="bg-gray-200 border-t-2 border-gray-300 p-2 fixed bottom-0 left-0 right-0 z-20"> <div className="max-w-4xl mx-auto"> <div className="flex justify-center items-center gap-2 mb-2 flex-wrap">{Object.entries(palettes).map(([label, key]) => <button key={key} onClick={() => setActivePalette(key)} className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${activePalette === key ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'}`}>{label}</button>)}</div> <div className="flex justify-center items-center gap-4 mb-3 flex-wrap"> <button onClick={undoChart} disabled={!canUndo} className="p-2 bg-white text-gray-700 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100" title="Deshacer"><Undo2 size={18}/></button> <button onClick={redoChart} disabled={!canRedo} className="p-2 bg-white text-gray-700 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100" title="Rehacer"><Redo2 size={18}/></button> {(activePalette !== 'manual' && activePalette !== 'symbols') && <button onClick={() => setChordMode(c => c === 'triad' ? 'tetrad' : 'triad')} className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-full bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 transition-colors">{chordMode === 'triad' ? <Tally3 className="h-4 w-4 text-blue-600"/> : <Tally4 className="h-4 w-4 text-blue-600"/>} {chordMode === 'triad' ? 'Tríadas' : 'Cuatríadas'}</button>} <div className="flex items-center"><label htmlFor="double-chord-toggle" className="text-sm font-medium text-gray-700 mr-2">2 acordes/compás</label><input type="checkbox" id="double-chord-toggle" checked={isDoubleChordMode} onChange={e => setIsDoubleChordMode(e.target.checked)} className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300" /></div> </div> <div className="grid grid-cols-4 sm:grid-cols-8 gap-2"> {activePalette === 'diatonic' && diatonicChords.map(c => <ChordButton key={c} chord={c} />)} {activePalette === 'other' && otherChords.map(c => <ChordButton key={c} chord={c} />)} {activePalette === 'symbols' && repeatSymbols.map(c => <ChordButton key={c} chord={c} />)} {activePalette === 'manual' &&  <> <select value={manualRoot} onChange={e => setManualRoot(e.target.value)} className="col-span-2 bg-white border rounded p-2 text-sm">{NOTES_SHARP.map(n=><option key={n}>{n}</option>)}</select> <select value={manualQuality} onChange={e => setManualQuality(e.target.value)} className="col-span-3 bg-white border rounded p-2 text-sm">{manualQualities[chordMode].map(q => <option key={q} value={q}>{q || 'maj'}</option>)}</select> <input value={manualBass} onChange={e => setManualBass(e.target.value)} placeholder="/E" className="col-span-2 bg-white border rounded p-2 text-sm"/> <button onClick={handleManualAdd} className="bg-blue-500 text-white rounded-md p-2 font-bold col-span-1">Add</button></>} </div> </div> </footer> ); };
+    const ChordInput = () => {
+        const diatonicChords = getDiatonicChords(chart.key, chart.mode, chordMode);
+        const otherChords = getOtherChords(chart.key, chart.mode, chordMode);
+        const repeatSymbols = ['|:', ':|', ':|x2', ':|x3', ':|x4', '|', '||'];
+        const [manualChord, setManualChord] = useState('');
+        const [manualBass, setManualBass] = useState('');
+        const palettes = { 'Diatónicos': 'diatonic', 'Otros': 'other', 'Símbolos': 'symbols', 'Manual': 'manual' };
+        
+        const ChordButton = ({ chord }) => <button onClick={() => handleInsertChord(chord)} className="bg-white border border-gray-300 rounded-md py-3 px-2 text-sm font-semibold text-gray-700 hover:bg-blue-100 hover:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all shadow-sm">{chord}</button>;
+        
+        const handleManualAdd = () => {
+            if (!manualChord.trim()) return;
+            let chord = manualChord.trim();
+            if(manualBass.trim()) {
+                chord += `/${manualBass.trim().replace('/', '')}`;
+            }
+            handleInsertChord(chord);
+            setManualChord('');
+            setManualBass('');
+        };
+
+        return (
+            <footer className="bg-gray-200 border-t-2 border-gray-300 p-2 fixed bottom-0 left-0 right-0 z-20">
+                <div className="max-w-4xl mx-auto">
+                    <div className="flex justify-center items-center gap-2 mb-2 flex-wrap">{Object.entries(palettes).map(([label, key]) => <button key={key} onClick={() => setActivePalette(key)} className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-colors ${activePalette === key ? 'bg-blue-600 text-white' : 'bg-white text-gray-600'}`}>{label}</button>)}</div>
+                    <div className="flex justify-center items-center gap-4 mb-3 flex-wrap">
+                        <button onClick={undoChart} disabled={!canUndo} className="p-2 bg-white text-gray-700 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100" title="Deshacer"><Undo2 size={18}/></button>
+                        <button onClick={redoChart} disabled={!canRedo} className="p-2 bg-white text-gray-700 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100" title="Rehacer"><Redo2 size={18}/></button>
+                        {(activePalette !== 'manual' && activePalette !== 'symbols') && <button onClick={() => setChordMode(c => c === 'triad' ? 'tetrad' : 'triad')} className="flex items-center gap-2 px-3 py-1.5 text-sm font-semibold rounded-full bg-white text-gray-700 border border-gray-300 hover:bg-gray-100 transition-colors">{chordMode === 'triad' ? <Tally3 className="h-4 w-4 text-blue-600"/> : <Tally4 className="h-4 w-4 text-blue-600"/>} {chordMode === 'triad' ? 'Tríadas' : 'Cuatríadas'}</button>}
+                        <div className="flex items-center"><label htmlFor="double-chord-toggle" className="text-sm font-medium text-gray-700 mr-2">2 acordes/compás</label><input type="checkbox" id="double-chord-toggle" checked={isDoubleChordMode} onChange={e => setIsDoubleChordMode(e.target.checked)} className="h-5 w-5 rounded text-blue-600 focus:ring-blue-500 border-gray-300" /></div>
+                    </div>
+                    <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
+                        {activePalette === 'diatonic' && diatonicChords.map(c => <ChordButton key={c} chord={c} />)}
+                        {activePalette === 'other' && otherChords.map(c => <ChordButton key={c} chord={c} />)}
+                        {activePalette === 'symbols' && repeatSymbols.map(c => <ChordButton key={c} chord={c} />)}
+                        {activePalette === 'manual' && (
+                             <form onSubmit={(e) => { e.preventDefault(); handleManualAdd(); }} className="col-span-full grid grid-cols-8 gap-2">
+                                <input
+                                    value={manualChord}
+                                    onChange={e => setManualChord(e.target.value)}
+                                    placeholder="Acorde (ej: Cmaj7)"
+                                    className="col-span-4 bg-white border rounded p-2 text-sm"
+                                />
+                                <input
+                                    value={manualBass}
+                                    onChange={e => setManualBass(e.target.value)}
+                                    placeholder="Bajo (ej: /G)"
+                                    className="col-span-3 bg-white border rounded p-2 text-sm"
+                                />
+                                <button
+                                    type="submit"
+                                    className="bg-blue-500 text-white rounded-md p-2 font-bold col-span-1"
+                                >
+                                    Añadir
+                                </button>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            </footer>
+        );
+    };
+
     const NewChartModal = ({ isOpen, onClose, onCreate }) => { const [newData, setNewData] = useState({ title: '', artist: '', mode: 'major', key: 'C' }); if (!isOpen) return null; const handleSubmit = (e) => { e.preventDefault(); onCreate(newData); }; const keysForMode = newData.mode === 'major' ? MAJOR_KEYS_CHROMATIC : MINOR_KEYS_CHROMATIC; return ( <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center"> <div className="bg-white p-6 rounded-lg shadow-xl w-full max-w-md"> <div className="flex justify-between items-center mb-4"><h2 className="text-2xl font-bold text-gray-800">Nueva Partitura</h2><button onClick={onClose} className="text-gray-500 hover:text-gray-800"><X size={24}/></button></div> <form onSubmit={handleSubmit}> <div className="mb-4"><label className="block text-gray-700">Título</label><input type="text" value={newData.title} onChange={e => setNewData({...newData, title: e.target.value})} className="w-full px-3 py-2 border rounded-md" required /></div> <div className="mb-4"><label className="block text-gray-700">Artista</label><input type="text" value={newData.artist} onChange={e => setNewData({...newData, artist: e.target.value})} className="w-full px-3 py-2 border rounded-md" /></div> <div className="flex gap-4 mb-6"> <div className="w-1/2"><label className="block text-gray-700">Tonalidad</label><select value={newData.key} onChange={e => setNewData({...newData, key: e.target.value})} className="w-full px-3 py-2 border rounded-md">{keysForMode.map(k => <option key={k} value={k}>{k}</option>)}</select></div> <div className="w-1/2"><label className="block text-gray-700">Modo</label><select value={newData.mode} onChange={e => setNewData({...newData, mode: e.target.value, key: e.target.value === 'major' ? 'C' : 'Am'})} className="w-full px-3 py-2 border rounded-md"><option value="major">Mayor</option><option value="minor">Menor</option></select></div> </div> <button type="submit" className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 font-semibold">Crear Partitura</button> </form> </div> </div> ); };
     const ContextualMenu = () => { if (!selection.start) return null; return ( <div className="absolute z-30 bg-white shadow-lg rounded-lg p-2 flex gap-2" style={{ top: '10px', right: '10px' }}> {clipboard.length > 0 && <button onClick={() => handleContextAction('paste')} className="p-2 hover:bg-gray-200 rounded-md" title="Pegar"><ClipboardPaste size={18} /></button>} <button onClick={() => handleContextAction('copy')} className="p-2 hover:bg-gray-200 rounded-md" title="Copiar"><Copy size={18} /></button> <button onClick={() => handleContextAction('cut')} className="p-2 hover:bg-gray-200 rounded-md" title="Cortar"><Scissors size={18} /></button> <button onClick={() => handleContextAction('delete')} className="p-2 hover:bg-red-100 text-red-600 rounded-md" title="Eliminar"><Trash2 size={18} /></button> </div> ); };
     const LoadChartModal = ({ isOpen, onClose, onLoad }) => {
         const [savedCharts, setSavedCharts] = useState([]);
         const [isLoading, setIsLoading] = useState(true);
 
-        useEffect(() => {
-            if (isOpen && user && !user.isAnonymous && db) {
-                setIsLoading(true);
-                const fetchCharts = async () => {
-                    try {
-                        const chartsRef = collection(db, `artifacts/${appId}/users/${user.uid}/charts`);
-                        const q = query(chartsRef);
-                        const querySnapshot = await getDocs(q);
-                        const charts = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                        setSavedCharts(charts);
-                    } catch (error) {
-                        console.error("Error al cargar partituras:", error);
-                        showNotification("No se pudieron cargar las partituras.", "error");
-                    } finally {
-                        setIsLoading(false);
-                    }
-                };
-                fetchCharts();
-            } else {
+        const fetchCharts = useCallback(async () => {
+            if (!user || user.isAnonymous || !db) {
                 setSavedCharts([]);
                 setIsLoading(false);
+                return;
             }
-        }, [isOpen, user]);
+            setIsLoading(true);
+            try {
+                const chartsRef = collection(db, `artifacts/${appId}/users/${user.uid}/charts`);
+                const q = query(chartsRef);
+                const querySnapshot = await getDocs(q);
+                const charts = querySnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                setSavedCharts(charts);
+            } catch (error) {
+                console.error("Error al cargar partituras:", error);
+                showNotification("No se pudieron cargar las partituras.", "error");
+            } finally {
+                setIsLoading(false);
+            }
+        }, [user]);
+
+        useEffect(() => {
+            if (isOpen) {
+                fetchCharts();
+            }
+        }, [isOpen, fetchCharts]);
 
         const handleDelete = async (chartIdToDelete) => {
+            if (!window.confirm("¿Seguro que quieres eliminar esta partitura de forma permanente?")) return;
             try {
                 const chartRef = doc(db, `artifacts/${appId}/users/${user.uid}/charts`, chartIdToDelete);
                 await deleteDoc(chartRef);
@@ -469,7 +535,7 @@ export default function App() {
                         <h2 className="text-2xl font-bold text-gray-800">Cargar Partitura</h2>
                         <button onClick={onClose} className="text-gray-500 hover:text-gray-800"><X size={24}/></button>
                     </div>
-                    {isLoading ? <p>Cargando partituras...</p> : (
+                    {isLoading ? <div className="flex justify-center items-center p-8"><Loader2 className="animate-spin text-blue-500" size={40}/></div> : (
                         <ul className="space-y-2 max-h-96 overflow-y-auto">
                             {savedCharts.length > 0 ? (
                                 savedCharts.sort((a,b) => new Date(b.savedAt) - new Date(a.savedAt)).map(chart => (
@@ -508,7 +574,7 @@ export default function App() {
             <ChordChart />
             <ChordInput />
             <NewChartModal isOpen={isNewChartModalOpen} onClose={() => setIsNewChartModalOpen(false)} onCreate={handleCreateNewChart} />
-            <LoadChartModal isOpen={isLoadChartModalOpen} onClose={() => setIsLoadChartModalOpen(false)} onLoad={handleLoadChart} showNotification={showNotification} />
+            <LoadChartModal isOpen={isLoadChartModalOpen} onClose={() => setIsLoadChartModalOpen(false)} onLoad={handleLoadChart} />
         </div>
     );
 }
