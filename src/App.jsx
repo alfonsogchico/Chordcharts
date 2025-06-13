@@ -9,15 +9,24 @@ import {
   orderBy
 } from 'firebase/firestore';
 
-// --- Firebase init ---
-// Define VITE_FIREBASE_CONFIG in Vercel as the JSON of your Firebase project
+// --- Firebase init safe ---
+// Define VITE_FIREBASE_CONFIG in Vercel → JSON string with apiKey, authDomain, etc.
 const firebaseConfig =
   typeof import.meta.env.VITE_FIREBASE_CONFIG !== 'undefined'
     ? JSON.parse(import.meta.env.VITE_FIREBASE_CONFIG)
     : {};
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+let db = null;
+try {
+  if (firebaseConfig && firebaseConfig.apiKey) {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+  } else {
+    console.warn('Firebase config missing: guardado/carga desactivados');
+  }
+} catch (e) {
+  console.error('Firebase init error', e);
+}
 
 export default function App() {
   const [chart, setChart] = useState('C | G | Am | F :|x2');
@@ -25,7 +34,7 @@ export default function App() {
 
   // --- CRUD ---
   const saveChart = async () => {
-    if (!chart.trim()) return;
+    if (!db || !chart.trim()) return;
     await addDoc(collection(db, 'charts'), {
       chart,
       savedAt: Date.now()
@@ -34,6 +43,7 @@ export default function App() {
   };
 
   const loadCharts = async () => {
+    if (!db) return;
     const snap = await getDocs(
       query(collection(db, 'charts'), orderBy('savedAt', 'desc'))
     );
@@ -42,7 +52,7 @@ export default function App() {
 
   useEffect(() => {
     loadCharts();
-  }, []);
+  }, [db]);
 
   // --- editor helpers ---
   const measures = chart
@@ -52,7 +62,7 @@ export default function App() {
 
   const renderMeasure = (m, i) => {
     const isFirst = i === 0;
-    const repeat = /:\\|x?\\d*$/.test(m);
+    const repeat = /:\|x?\d*$/.test(m); // detect final :| or :|x2 etc.
 
     const classes = [
       'px-2',
@@ -65,7 +75,7 @@ export default function App() {
 
     return (
       <div key={i} className={classes}>
-        {m.replace(/:\\|x?\\d*$/, '')}
+        {m.replace(/:\|x?\d*$/, '')}
       </div>
     );
   };
@@ -93,19 +103,23 @@ export default function App() {
         {measures.map(renderMeasure)}
       </div>
 
-      <h2 className="text-xl font-semibold mt-8 mb-2">Guardados</h2>
-      <ul className="space-y-1">
-        {charts.map((c) => (
-          <li key={c.id}>
-            <button
-              onClick={() => setChart(c.chart)}
-              className="underline text-blue-700 hover:text-blue-900"
-            >
-              {c.chart}
-            </button>
-          </li>
-        ))}
-      </ul>
+      {db && (
+        <>
+          <h2 className="text-xl font-semibold mt-8 mb-2">Guardados</h2>
+          <ul className="space-y-1">
+            {charts.map((c) => (
+              <li key={c.id}>
+                <button
+                  onClick={() => setChart(c.chart)}
+                  className="underline text-blue-700 hover:text-blue-900"
+                >
+                  {c.chart}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
