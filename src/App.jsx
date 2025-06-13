@@ -8,22 +8,45 @@ import { ChevronUp, ChevronDown, Save, Music4, Trash2, Copy, PlusCircle, Pilcrow
 
 // --- Configuración e inicialización de Firebase ---
 let app, auth, db;
-// La variable __app_id se inyecta globalmente en el entorno de ejecución.
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+let appId; // Se definirá después de la configuración
 
 try {
-    // La variable __firebase_config se inyecta globalmente como una cadena JSON.
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+    let firebaseConfig;
+
+    // Entorno Canvas (usa variables globales inyectadas)
+    if (typeof __firebase_config !== 'undefined' && __firebase_config) {
+        firebaseConfig = JSON.parse(__firebase_config);
+        appId = typeof __app_id !== 'undefined' ? __app_id : firebaseConfig.appId;
+    } 
+    // Entorno de producción/desarrollo (Vercel, etc.)
+    // Lee desde variables de entorno. Es necesario configurarlas en Vercel.
+    else if (process.env.REACT_APP_FIREBASE_API_KEY) {
+        firebaseConfig = {
+            apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+            authDomain: process.env.REACT_APP_FIREBASE_AUTH_DOMAIN,
+            projectId: process.env.REACT_APP_FIREBASE_PROJECT_ID,
+            storageBucket: process.env.REACT_APP_FIREBASE_STORAGE_BUCKET,
+            messagingSenderId: process.env.REACT_APP_FIREBASE_MESSAGING_SENDER_ID,
+            appId: process.env.REACT_APP_FIREBASE_APP_ID,
+        };
+        // En un entorno de producción, el ID de la app de Firestore puede ser el ID del proyecto.
+        appId = firebaseConfig.projectId; 
+    }
+
     if (firebaseConfig && Object.keys(firebaseConfig).length > 0) {
         app = initializeApp(firebaseConfig);
         auth = getAuth(app);
         db = getFirestore(app);
+        if (!appId) appId = firebaseConfig.projectId || 'default-app-id'; // Asegura que appId tenga un valor
     } else {
-        console.error("La configuración de Firebase está ausente o vacía.");
+        console.error("La configuración de Firebase está ausente. Asegúrate de configurar las variables de entorno en Vercel.");
+        appId = 'default-app-id'; // Fallback
     }
 } catch (e) {
     console.error("Error al inicializar Firebase", e);
+    appId = 'default-app-id'; // Fallback
 }
+
 
 // --- Ayudantes de Teoría Musical ---
 const NOTES_SHARP = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -87,7 +110,6 @@ export default function App() {
     // --- Efectos ---
     useEffect(() => { const scripts = [ 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js' ]; let loadedCount = 0; scripts.forEach(src => { if (document.querySelector(`script[src="${src}"]`)) { loadedCount++; if (loadedCount === scripts.length) setPdfScriptsLoaded(true); return; } const script = document.createElement('script'); script.src = src; script.async = true; script.onload = () => { loadedCount++; if (loadedCount === scripts.length) setPdfScriptsLoaded(true); }; document.body.appendChild(script); }); }, []);
     
-    // CORRECCIÓN: Flujo de autenticación mejorado para el entorno de ejecución.
     useEffect(() => {
         if (!auth) {
             setIsAuthReady(true);
@@ -101,7 +123,6 @@ export default function App() {
         });
 
         (async () => {
-            // La variable __initial_auth_token se inyecta globalmente.
             const token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
             try {
                 if (token) {
@@ -129,13 +150,14 @@ export default function App() {
     };
 
     const handleSaveChart = async () => { 
-        if (!userId || !db || isSaving) return; 
+        if (!userId || !db || isSaving) {
+            if (!db) console.error("DB no inicializada. ¿Faltan las variables de entorno en Vercel?");
+            return;
+        }; 
         setIsSaving(true); 
         try { 
             const savedAt = new Date().toISOString(); 
-            // CORRECCIÓN: La serialización de 'sections' es clave para Firestore.
             const chartToSave = { ...chart, savedAt, sections: JSON.stringify(chart.sections) }; 
-            // CORRECCIÓN: Se usa la variable `appId` global para la ruta correcta.
             const chartRef = doc(db, `artifacts/${appId}/users/${userId}/charts`, chartToSave.id); 
             await setDoc(chartRef, chartToSave); 
             setChart(p => ({...p, savedAt}), true); 
@@ -277,14 +299,12 @@ export default function App() {
                                     </div>
                                 </div>
                                 <div className="space-y-1 font-mono text-lg">
-                                    {/* CORRECCIÓN: Lógica de renderizado de pentagramas y barras de compás */}
                                     {Array.from({ length: Math.ceil(section.measures.length / measuresPerLine) || (section.measures.length === 0 ? 1 : 0) }).map((_, lineIndex) => {
                                         const isLastLineOfSection = (lineIndex + 1) * measuresPerLine >= section.measures.length;
                                         if (lineIndex > 0 && section.measures.length <= lineIndex * measuresPerLine) return null;
 
                                         return (
                                             <div key={`line-${section.id}-${lineIndex}`} className="flex items-stretch w-full">
-                                                {/* Barra de inicio de pentagrama */}
                                                 <div className="w-6 flex-shrink-0 flex items-center justify-center font-bold text-lg text-gray-600">
                                                     {section.measures[lineIndex * measuresPerLine]?.startRepeat ? '|:' : '|'}
                                                 </div>
@@ -303,7 +323,6 @@ export default function App() {
                                                                 <div className={`h-12 flex items-center justify-center cursor-pointer rounded-sm flex-1 ${isSelected ? 'bg-green-100 ring-2 ring-green-500' : 'hover:bg-gray-100'}`} onClick={measure ? (e) => handleMeasureClick(e, section.id, globalMeasureIndex) : undefined}>
                                                                     {measure && measure.chords.length > 1 ? (<div className="flex justify-around w-full"><span>{measure.chords[0]}</span><span>{measure.chords[1]}</span></div>) : (<span className="whitespace-nowrap overflow-hidden text-ellipsis px-1">{measure ? measure.chords.join(' ') : '\u00A0'}</span>)}
                                                                 </div>
-                                                                {/* Barra de compás intermedia */}
                                                                 {(measureIndexInLine < measuresPerLine - 1 && globalMeasureIndex < section.measures.length - 1) && (
                                                                     <div className="w-6 flex-shrink-0 flex items-center justify-center font-bold text-lg text-gray-600">
                                                                         {measure.endRepeat ? (measure.endRepeat === '||' ? '||' : ':|') : (nextMeasure?.startRepeat ? '|:' : '|')}
@@ -313,7 +332,6 @@ export default function App() {
                                                         );
                                                     })}
                                                 </div>
-                                                {/* Barra de fin de pentagrama */}
                                                 <div className="w-6 flex-shrink-0 flex items-center justify-center font-bold text-lg text-gray-600">
                                                    {(() => {
                                                         const lastMeasureOnLine = section.measures[Math.min(lineIndex * measuresPerLine + (measuresPerLine - 1), section.measures.length - 1)];
