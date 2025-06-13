@@ -9,7 +9,7 @@ import {
   orderBy
 } from 'firebase/firestore';
 
-// --- Firebase init safe ---
+// ------------- Firebase init (safe) -------------
 // Define VITE_FIREBASE_CONFIG in Vercel → JSON string with apiKey, authDomain, etc.
 const firebaseConfig =
   typeof import.meta.env.VITE_FIREBASE_CONFIG !== 'undefined'
@@ -28,11 +28,20 @@ try {
   console.error('Firebase init error', e);
 }
 
+// ------------- UI helpers -------------
+const StaffLines = () => (
+  <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
+    {[...Array(5)].map((_, i) => (
+      <div key={i} className="border-t border-black/70" />
+    ))}
+  </div>
+);
+
 export default function App() {
   const [chart, setChart] = useState('C | G | Am | F :|x2');
   const [charts, setCharts] = useState([]);
 
-  // --- CRUD ---
+  // ---------- CRUD ----------
   const saveChart = async () => {
     if (!db || !chart.trim()) return;
     await addDoc(collection(db, 'charts'), {
@@ -54,7 +63,7 @@ export default function App() {
     loadCharts();
   }, [db]);
 
-  // --- editor helpers ---
+  // ---------- Chart parsing ----------
   const measures = chart
     .split('|')
     .map((s) => s.trim())
@@ -65,8 +74,8 @@ export default function App() {
     const repeat = /:\|x?\d*$/.test(m); // detect final :| or :|x2 etc.
 
     const classes = [
-      'px-2',
-      'min-w-[60px]',
+      'px-3',
+      'min-w-[70px]',
       'text-center',
       'border-black',
       repeat ? 'border-double border-r-4' : 'border-r',
@@ -80,16 +89,17 @@ export default function App() {
     );
   };
 
-  // --- render ---
+  // ---------- Render ----------
   return (
     <div className="max-w-3xl mx-auto mt-10 font-sans px-4">
       <h1 className="text-2xl font-bold mb-4">ChordCharts</h1>
 
+      {/* Editor */}
       <textarea
         rows={4}
         value={chart}
         onChange={(e) => setChart(e.target.value)}
-        className="w-full font-mono text-base border border-gray-300 rounded p-2 mb-3"
+        className="w-full font-mono text-base border border-gray-300 rounded p-2 mb-4"
       />
 
       <button
@@ -99,10 +109,15 @@ export default function App() {
         Guardar
       </button>
 
-      <div className="flex flex-wrap border-y-2 border-black py-1">
-        {measures.map(renderMeasure)}
+      {/* Staff */}
+      <div className="relative overflow-x-auto">
+        <StaffLines />
+        <div className="flex border-y-2 border-black bg-white/80 backdrop-blur-sm">
+          {measures.map(renderMeasure)}
+        </div>
       </div>
 
+      {/* Saved charts */}
       {db && (
         <>
           <h2 className="text-xl font-semibold mt-8 mb-2">Guardados</h2>
