@@ -85,7 +85,22 @@ const getNoteName = (index, useSharp) => { const i = (index % 12 + 12) % 12; ret
 const getUseSharp = (key) => { const root = key.replace('m', ''); const flatKeys = ['F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb']; if (flatKeys.includes(root)) return false; if (key.endsWith('m')) { const relMajorRoot = getNoteName(getNoteIndex(root) + 3); if (flatKeys.includes(relMajorRoot)) return false; } return true; };
 const getDiatonicChords = (key, mode, quality) => { const keyIndex = getNoteIndex(key); if (keyIndex === -1) return []; const useSharp = getUseSharp(key); let qualities; if (mode === 'major') { qualities = quality === 'tetrad' ? [{q:'maj7',i:0},{q:'m7',i:2},{q:'m7',i:4},{q:'maj7',i:5},{q:'7',i:7},{q:'m7',i:9}] : [{q:'',i:0},{q:'m',i:2},{q:'m',i:4},{q:'',i:5},{q:'7',i:7},{q:'m',i:9}]; } else { qualities = quality === 'tetrad' ? [{q:'m7',i:0},{q:'m7b5',i:2},{q:'maj7',i:3},{q:'m7',i:5},{q:'7',i:7},{q:'maj7',i:8},{q:'7',i:10}] : [{q:'m',i:0},{q:'dim',i:2},{q:'',i:3},{q:'m',i:5},{q:'',i:7},{q:'',i:8},{q:'',i:10}]; } return qualities.map(c => getNoteName(keyIndex + c.i, useSharp) + c.q); };
 const getOtherChords = (key, mode = 'major', quality = 'tetrad') => { const keyIndex = getNoteIndex(key); if (keyIndex === -1) return []; const useSharp = getUseSharp(key); const chords = []; const secondaryTargets = mode === 'major' ? [2, 4, 7, 9] : [5, 7]; secondaryTargets.forEach(step => { const targetNoteIndex = keyIndex + step; const dominantIndex = targetNoteIndex + 7; const dominantNote = getNoteName(dominantIndex, useSharp); chords.push(dominantNote + (quality === 'tetrad' ? '7' : '')); }); if (mode === 'major') { const ivm = getNoteName(keyIndex + 5, useSharp) + (quality === 'tetrad' ? 'm7' : 'm'); const bVI = getNoteName(keyIndex + 8, false) + (quality === 'tetrad' ? 'maj7' : ''); const bVII = getNoteName(keyIndex + 10, false) + (quality === 'tetrad' ? '7' : ''); chords.push(ivm, bVI, bVII); } return [...new Set(chords)]; };
-const transposeChord = (chord, steps, newKey) => { if (chord === '%') return '%'; const useSharp = getUseSharp(newKey); return chord.split('/').map(part => { const rootMatch = part.match(/^[A-G][#b]?/)?.[0] || note; const root = rootMatch[0]; const quality = part.substring(root.length); const rootIndex = getNoteIndex(root); if (rootIndex === -1) return part; return getNoteName(rootIndex + steps, useSharp) + quality; }).join('/'); };
+
+// CORRECCIÓN: Se ha restaurado la función de transposición a la versión original que funcionaba.
+const transposeChord = (chord, steps, newKey) => {
+    if (chord === '%') return '%';
+    const useSharp = getUseSharp(newKey);
+    return chord.split('/').map(part => {
+        const rootMatch = part.match(/^[A-G][#b]?/);
+        if (!rootMatch) return part;
+        const root = rootMatch[0];
+        const quality = part.substring(root.length);
+        const rootIndex = getNoteIndex(root);
+        if (rootIndex === -1) return part;
+        return getNoteName(rootIndex + steps, useSharp) + quality;
+    }).join('/');
+};
+
 
 // --- Hook de Historial ---
 const useHistoryState = (initialState) => {
@@ -276,7 +291,7 @@ export default function App() {
     const handleCreateNewChart = (newData) => { resetHistory({ id: `chart-${Date.now()}`, title: newData.title, artist: newData.artist, key: newData.key, mode: newData.mode, savedAt: null, sections: [{ id: Date.now(), name: 'Intro', measures: [] }] }); setIsNewChartModalOpen(false); };
     const handleRenameSection = (id, newName) => { setChart(p => ({ ...p, sections: p.sections.map(s => s.id === id ? { ...s, name: newName } : s) })); setEditingSection(null); };
     const handleDragStart = (e, index) => setDraggedItem(chart.sections[index]);
-    const handleDragOver = (e, index) => { e.preventDefault(); const draggedOverItem = chart.sections[index]; if (draggedItem === draggedOverItem) return; let items = chart.sections.filter(item => item !== draggedOverItem); items.splice(index, 0, draggedItem); setChart(p => ({ ...p, sections: items })); };
+    const handleDragOver = (e, index) => { e.preventDefault(); const draggedOverItem = chart.sections[index]; if (draggedItem === draggedOverItem) return; let items = chart.sections.filter(item => item !== draggedItem); items.splice(index, 0, draggedItem); setChart(p => ({ ...p, sections: items })); };
     const handleDragEnd = () => setDraggedItem(null);
     const handleAddSection = (index) => setChart(p => { const newSections = [...p.sections]; newSections.splice(index + 1, 0, { id: Date.now(), name: 'Nueva Sección', measures: []}); return {...p, sections: newSections}; });
     const handleDuplicateSection = (index) => setChart(p => { const newSections = [...p.sections]; const sectionToCopy = p.sections[index]; newSections.splice(index + 1, 0, { ...sectionToCopy, id: Date.now(), name: `${sectionToCopy.name} (Copia)` }); return {...p, sections: newSections}; });
