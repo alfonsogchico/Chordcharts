@@ -97,7 +97,7 @@ const useHistoryState = (initialState) => {
     const resetHistory = (newState) => { setHistory([newState]); setIndex(0); };
     return [state, setState, undo, redo, index > 0, index < history.length - 1, resetHistory];
 };
-
+console.log("Valor de la clave de API en el entorno:", process.env.REACT_APP_FIREBASE_API_KEY);
 // --- Componente Principal de la App ---
 export default function App() {
     const [userId, setUserId] = useState(null);
